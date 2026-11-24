@@ -1,7 +1,10 @@
 import React from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { LandingPage } from '@/features/landing/LandingPage';
-import { LoginPage } from '@/features/auth/LoginPage';
+import { PortalSelectPage } from '@/features/auth/PortalSelectPage';
+import { OwnerLoginPage } from '@/features/auth/OwnerLoginPage';
+import { ManagerLoginPage } from '@/features/auth/ManagerLoginPage';
+import { AgentLoginPage } from '@/features/auth/AgentLoginPage';
 import { AppLayout } from '@/app/AppLayout';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { LeadsPage } from '@/features/leads/LeadsPage';
@@ -24,12 +27,42 @@ export const router = createBrowserRouter([
     element: <LandingPage />,
   },
 
-  // Login Page (Redirects to /app/dashboard if already authenticated)
+  // 1. Portal Directory Page
   {
     path: '/login',
     element: (
       <PublicOnlyRoute>
-        <LoginPage />
+        <PortalSelectPage />
+      </PublicOnlyRoute>
+    ),
+  },
+
+  // 2. Dedicated Owner Portal Login
+  {
+    path: '/login/owner',
+    element: (
+      <PublicOnlyRoute>
+        <OwnerLoginPage />
+      </PublicOnlyRoute>
+    ),
+  },
+
+  // 3. Dedicated Manager Portal Login
+  {
+    path: '/login/manager',
+    element: (
+      <PublicOnlyRoute>
+        <ManagerLoginPage />
+      </PublicOnlyRoute>
+    ),
+  },
+
+  // 4. Dedicated Agent Portal Login
+  {
+    path: '/login/agent',
+    element: (
+      <PublicOnlyRoute>
+        <AgentLoginPage />
       </PublicOnlyRoute>
     ),
   },
