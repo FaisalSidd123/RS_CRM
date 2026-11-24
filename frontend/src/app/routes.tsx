@@ -15,19 +15,33 @@ import { CommissionsPage } from '@/features/commissions/CommissionsPage';
 import { WhatsAppPage } from '@/features/whatsapp/WhatsAppPage';
 import { ActivityPage } from '@/features/activity/ActivityPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
+import { ProtectedRoute, PublicOnlyRoute } from '@/components/ProtectedRoute';
 
 export const router = createBrowserRouter([
+  // Public Marketing Landing Page
   {
     path: '/',
     element: <LandingPage />,
   },
+
+  // Login Page (Redirects to /app/dashboard if already authenticated)
   {
     path: '/login',
-    element: <LoginPage />,
+    element: (
+      <PublicOnlyRoute>
+        <LoginPage />
+      </PublicOnlyRoute>
+    ),
   },
+
+  // Protected App Shell (Requires Authentication)
   {
     path: '/app',
-    element: <AppLayout />,
+    element: (
+      <ProtectedRoute>
+        <AppLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -61,25 +75,45 @@ export const router = createBrowserRouter([
         path: 'tasks',
         element: <TasksPage />,
       },
+      // Restricted to Owner and Manager
       {
         path: 'agents',
-        element: <AgentsPage />,
+        element: (
+          <ProtectedRoute requiredPermission="view_agents_page">
+            <AgentsPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'commissions',
         element: <CommissionsPage />,
       },
+      // Restricted to Owner and Manager
       {
         path: 'whatsapp',
-        element: <WhatsAppPage />,
+        element: (
+          <ProtectedRoute requiredPermission="view_whatsapp">
+            <WhatsAppPage />
+          </ProtectedRoute>
+        ),
       },
+      // Restricted to Owner only
       {
         path: 'activity',
-        element: <ActivityPage />,
+        element: (
+          <ProtectedRoute requiredPermission="view_activity_log">
+            <ActivityPage />
+          </ProtectedRoute>
+        ),
       },
+      // Restricted to Owner and Manager
       {
         path: 'settings',
-        element: <SettingsPage />,
+        element: (
+          <ProtectedRoute requiredPermission="view_settings">
+            <SettingsPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: '*',
@@ -92,4 +126,3 @@ export const router = createBrowserRouter([
     element: <Navigate to="/" replace />,
   },
 ]);
-

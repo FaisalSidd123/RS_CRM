@@ -4,10 +4,11 @@ import { User, UserRole } from '@/types';
 import { INITIAL_USERS } from '@/data/users';
 
 interface AuthState {
-  currentUser: User;
+  currentUser: User | null;
   token: string | null;
-  setCurrentUser: (user: User) => void;
+  setCurrentUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
+  isAuthenticated: () => boolean;
   switchRole: (role: UserRole) => void;
   switchUserById: (userId: string) => void;
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
@@ -16,11 +17,12 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
-      currentUser: INITIAL_USERS[0], // Imran Qureshi (Owner)
+    (set, get) => ({
+      currentUser: null, // Strict unauthenticated initial state
       token: null,
       setCurrentUser: (user) => set({ currentUser: user }),
       setToken: (token) => set({ token }),
+      isAuthenticated: () => Boolean(get().token && get().currentUser),
       switchRole: (role) => {
         const target = INITIAL_USERS.find((u) => u.role === role) || INITIAL_USERS[0];
         set({ currentUser: target });
@@ -30,7 +32,7 @@ export const useAuthStore = create<AuthState>()(
         set({ currentUser: target });
       },
       logout: () => {
-        set({ token: null });
+        set({ token: null, currentUser: null });
       },
       login: async (email: string, password: string) => {
         const cleanEmail = email.trim().toLowerCase();
@@ -77,7 +79,7 @@ export const useAuthStore = create<AuthState>()(
           set({ currentUser: mappedUser, token: data.token });
           return { success: true, message: `Welcome back, ${mappedUser.name}!` };
         } catch (fetchErr) {
-          // 2. Strict Offline/Demo Credential Validation (If backend server is stopped)
+          // 2. Strict Offline Credential Validation (If backend server is stopped)
           // NEVER allow random passwords!
           const VALID_PASSWORDS: Record<string, string> = {
             'imran@propertyos.pk': 'admin123',
@@ -126,7 +128,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'propertyos-auth-storage',
+      name: 'propertyos-auth-storage-v2', // Upgraded storage key to enforce login
     }
   )
 );
