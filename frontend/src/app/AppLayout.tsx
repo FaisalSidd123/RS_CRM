@@ -95,35 +95,14 @@ export const AppLayout: React.FC = () => {
     { label: 'Settings', icon: Settings, path: '/app/settings', visible: can(currentUser?.role, 'view_settings') },
   ];
 
-  const handleRoleSwitch = (role: UserRole) => {
-    switchRole(role);
-    toast.info(`Switched active view to ${role} role. Permissions & views updated.`);
-  };
-
   const handleLogout = () => {
+    useAuthStore.getState().logout();
     navigate('/login');
     toast.info('Logged out of PropertyOS.');
   };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
-      {/* Thin Dismissible Demo Banner */}
-      {!bannerDismissed && (
-        <div className="bg-emerald-800 text-white px-4 py-1.5 text-xs flex items-center justify-between font-medium">
-          <div className="flex items-center gap-2 mx-auto">
-            <span className="bg-emerald-600/60 uppercase tracking-wider text-[10px] px-1.5 py-0.5 rounded font-semibold">Demo Mode</span>
-            <span>All CRM data is simulated in Pakistan context (Karachi, Lahore, Islamabad). Changes persist in localStorage.</span>
-          </div>
-          <button
-            onClick={() => setBannerDismissed(true)}
-            className="hover:opacity-80 p-0.5"
-            title="Dismiss banner"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-
       {/* Top Header */}
       <header className="sticky top-0 z-30 h-14 bg-white border-b border-slate-200 px-4 md:px-6 flex items-center justify-between gap-4">
         {/* Left: Mobile menu toggle + Logo branding */}
@@ -305,27 +284,19 @@ export const AppLayout: React.FC = () => {
             <DropdownMenuContent align="end" className="w-56 p-1.5">
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-xs font-semibold text-slate-900 leading-none">{currentUser?.name}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-slate-900 leading-none">{currentUser?.name}</p>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                      {currentUser?.role}
+                    </span>
+                  </div>
                   <p className="text-[11px] text-slate-500 leading-none">{currentUser?.email}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                Demo Quick Switch Role
-              </DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleRoleSwitch('Owner')} className={cn(currentUser?.role === 'Owner' && 'bg-slate-100 font-semibold')}>
-                Owner (Imran Qureshi)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleRoleSwitch('Manager')} className={cn(currentUser?.role === 'Manager' && 'bg-slate-100 font-semibold')}>
-                Manager (Sana Malik)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleRoleSwitch('Agent')} className={cn(currentUser?.role === 'Agent' && 'bg-slate-100 font-semibold')}>
-                Agent (Bilal Ahmed)
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-700">
+              <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-700 cursor-pointer">
                 <LogOut className="h-3.5 w-3.5 mr-2" />
-                Logout
+                Sign Out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -37,6 +37,18 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
+    // Strict Portal Role Verification Guard
+    const loggedInUser = useAuthStore.getState().currentUser;
+    if (loggedInUser && loggedInUser.role !== selectedRole) {
+      // Revoke session immediately
+      useAuthStore.getState().logout();
+      toast.error(
+        `Access Denied: ${loggedInUser.name} is registered as an ${loggedInUser.role}. You cannot enter the ${selectedRole} Portal with ${loggedInUser.role} credentials. Please switch to the ${loggedInUser.role} tab.`,
+        'Portal Role Mismatch'
+      );
+      return;
+    }
+
     toast.success(res.message);
     navigate('/app/dashboard');
   };
