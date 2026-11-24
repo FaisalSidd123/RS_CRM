@@ -1,30 +1,43 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
-import { INITIAL_USERS } from '@/data/users';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
-import { ShieldCheck, UserCheck, Briefcase, Lock, ArrowRight, Check } from 'lucide-react';
+import { ShieldCheck, UserCheck, Briefcase, Lock, ArrowRight, Loader2 } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { switchUserById, switchRole } = useAuthStore();
-  const [email, setEmail] = useState('imran@crescentrealty.pk');
-  const [password, setPassword] = useState('demo1234');
+  const { login } = useAuthStore();
+  const [email, setEmail] = useState('imran@propertyos.pk');
+  const [password, setPassword] = useState('admin123');
   const [selectedRole, setSelectedRole] = useState<'Owner' | 'Manager' | 'Agent'>('Owner');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleRoleQuickSelect = (role: 'Owner' | 'Manager' | 'Agent', userId: string, userEmail: string) => {
+  const handleRoleQuickSelect = (
+    role: 'Owner' | 'Manager' | 'Agent',
+    userEmail: string,
+    defaultPass: string
+  ) => {
     setSelectedRole(role);
     setEmail(userEmail);
-    switchUserById(userId);
+    setPassword(defaultPass);
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    switchRole(selectedRole);
-    toast.success(`Welcome to PropertyOS Pakistan! Logged in as ${selectedRole}.`);
+    setIsLoading(true);
+
+    const res = await login(email, password);
+    setIsLoading(false);
+
+    if (!res.success) {
+      toast.error(res.message, 'Authentication Failed');
+      return;
+    }
+
+    toast.success(res.message);
     navigate('/app/dashboard');
   };
 
@@ -47,7 +60,7 @@ export const LoginPage: React.FC = () => {
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-lg">Sign in to your agency portal</CardTitle>
             <CardDescription>
-              Select a demo profile or enter your credentials below
+              Select a persona or enter verified staff credentials
             </CardDescription>
           </CardHeader>
 
@@ -55,12 +68,12 @@ export const LoginPage: React.FC = () => {
             {/* Quick Role Switcher Buttons */}
             <div className="space-y-2">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Instant Demo Access — Choose Persona
+                Select Portal Persona
               </label>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
-                  onClick={() => handleRoleQuickSelect('Owner', 'usr-1', 'imran@crescentrealty.pk')}
+                  onClick={() => handleRoleQuickSelect('Owner', 'imran@propertyos.pk', 'admin123')}
                   className={`flex flex-col items-center justify-center p-2.5 rounded-lg border text-xs transition-all ${
                     selectedRole === 'Owner'
                       ? 'border-emerald-600 bg-emerald-50/80 text-emerald-900 font-semibold ring-1 ring-emerald-600'
@@ -74,7 +87,7 @@ export const LoginPage: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={() => handleRoleQuickSelect('Manager', 'usr-2', 'sana@crescentrealty.pk')}
+                  onClick={() => handleRoleQuickSelect('Manager', 'sana@propertyos.pk', 'manager123')}
                   className={`flex flex-col items-center justify-center p-2.5 rounded-lg border text-xs transition-all ${
                     selectedRole === 'Manager'
                       ? 'border-emerald-600 bg-emerald-50/80 text-emerald-900 font-semibold ring-1 ring-emerald-600'
@@ -88,7 +101,7 @@ export const LoginPage: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={() => handleRoleQuickSelect('Agent', 'usr-4', 'bilal@crescentrealty.pk')}
+                  onClick={() => handleRoleQuickSelect('Agent', 'bilal@propertyos.pk', 'agent123')}
                   className={`flex flex-col items-center justify-center p-2.5 rounded-lg border text-xs transition-all ${
                     selectedRole === 'Agent'
                       ? 'border-emerald-600 bg-emerald-50/80 text-emerald-900 font-semibold ring-1 ring-emerald-600'
@@ -109,6 +122,7 @@ export const LoginPage: React.FC = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  placeholder="e.g. imran@propertyos.pk"
                   required
                 />
               </div>
@@ -116,29 +130,45 @@ export const LoginPage: React.FC = () => {
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-medium text-slate-700">Password</label>
-                  <span className="text-[11px] text-slate-400">demo1234</span>
+                  <span className="text-[11px] text-slate-400">
+                    {selectedRole === 'Owner' ? 'admin123' : selectedRole === 'Manager' ? 'manager123' : 'agent123'}
+                  </span>
                 </div>
                 <Input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter account password"
                   required
                 />
               </div>
 
-              <Button type="submit" className="w-full h-10 font-semibold flex items-center justify-center gap-2">
-                Sign In as {selectedRole}
-                <ArrowRight className="h-4 w-4" />
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-10 font-semibold flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Verifying Credentials...
+                  </>
+                ) : (
+                  <>
+                    Sign In as {selectedRole}
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </Button>
             </form>
 
             <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500 space-y-1 border border-slate-100">
               <div className="flex items-center gap-1.5 font-semibold text-slate-700">
                 <Lock className="h-3.5 w-3.5 text-emerald-700" />
-                Enterprise Security Demonstration
+                Real Authentication Active
               </div>
               <p className="text-[11px] leading-relaxed">
-                Notice how switching to <strong>Agent</strong> hides financials, commissions, and masks owner telephone numbers automatically.
+                Passwords are now cryptographically validated against the backend. Entering an incorrect password will block access with a 401 Unauthorized rejection.
               </p>
             </div>
           </CardContent>
@@ -151,4 +181,3 @@ export const LoginPage: React.FC = () => {
     </div>
   );
 };
-
