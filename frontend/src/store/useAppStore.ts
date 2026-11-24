@@ -6,17 +6,7 @@ import {
   ActivityLogEntry, NotificationItem, User, DealStage, VisitFeedback, TaskPriority, TaskType
 } from '@/types';
 import { INITIAL_USERS } from '@/data/users';
-import { INITIAL_PROPERTIES } from '@/data/properties';
-import { INITIAL_CLIENTS } from '@/data/clients';
-import { INITIAL_LEADS } from '@/data/leads';
-import { INITIAL_DEALS } from '@/data/deals';
-import { INITIAL_COMMISSIONS } from '@/data/commissions';
-import { INITIAL_EXPENSES } from '@/data/expenses';
-import { INITIAL_VISITS } from '@/data/visits';
-import { INITIAL_TASKS } from '@/data/tasks';
-import { INITIAL_WHATSAPP_RULES, INITIAL_WHATSAPP_TEMPLATES, INITIAL_WHATSAPP_LOGS } from '@/data/whatsapp';
-import { INITIAL_ACTIVITY_LOG } from '@/data/activityLog';
-import { INITIAL_NOTIFICATIONS } from '@/data/notifications';
+import { INITIAL_WHATSAPP_RULES, INITIAL_WHATSAPP_TEMPLATES } from '@/data/whatsapp';
 import { calculateCommission } from '@/lib/commission';
 import { formatISO } from 'date-fns';
 
@@ -132,19 +122,19 @@ export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       users: INITIAL_USERS,
-      leads: INITIAL_LEADS,
-      properties: INITIAL_PROPERTIES,
-      clients: INITIAL_CLIENTS,
-      deals: INITIAL_DEALS,
-      visits: INITIAL_VISITS,
-      tasks: INITIAL_TASKS,
-      commissions: INITIAL_COMMISSIONS,
-      expenses: INITIAL_EXPENSES,
+      leads: [],
+      properties: [],
+      clients: [],
+      deals: [],
+      visits: [],
+      tasks: [],
+      commissions: [],
+      expenses: [],
       whatsappRules: INITIAL_WHATSAPP_RULES,
       whatsappTemplates: INITIAL_WHATSAPP_TEMPLATES,
-      whatsappLogs: INITIAL_WHATSAPP_LOGS,
-      activityLogs: INITIAL_ACTIVITY_LOG,
-      notifications: INITIAL_NOTIFICATIONS,
+      whatsappLogs: [],
+      activityLogs: [],
+      notifications: [],
       agencyProfile: DEFAULT_AGENCY_PROFILE,
 
       // Leads Actions
@@ -661,25 +651,25 @@ export const useAppStore = create<AppState>()(
       resetDemoData: () => {
         set({
           users: INITIAL_USERS,
-          leads: INITIAL_LEADS,
-          properties: INITIAL_PROPERTIES,
-          clients: INITIAL_CLIENTS,
-          deals: INITIAL_DEALS,
-          visits: INITIAL_VISITS,
-          tasks: INITIAL_TASKS,
-          commissions: INITIAL_COMMISSIONS,
-          expenses: INITIAL_EXPENSES,
+          leads: [],
+          properties: [],
+          clients: [],
+          deals: [],
+          visits: [],
+          tasks: [],
+          commissions: [],
+          expenses: [],
           whatsappRules: INITIAL_WHATSAPP_RULES,
           whatsappTemplates: INITIAL_WHATSAPP_TEMPLATES,
-          whatsappLogs: INITIAL_WHATSAPP_LOGS,
-          activityLogs: INITIAL_ACTIVITY_LOG,
-          notifications: INITIAL_NOTIFICATIONS,
+          whatsappLogs: [],
+          activityLogs: [],
+          notifications: [],
           agencyProfile: DEFAULT_AGENCY_PROFILE,
         });
       },
     }),
     {
-      name: 'propertyos-crm-storage-v1',
+      name: 'propertyos-crm-live-production-v1',
     }
   )
 );
