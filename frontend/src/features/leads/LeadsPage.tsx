@@ -74,6 +74,7 @@ export const LeadsPage: React.FC = () => {
   const { currentUser } = useAuthStore();
   const {
     leads,
+    fetchBackendLeads,
     addLead,
     updateLead,
     reassignLeads,
@@ -105,6 +106,15 @@ export const LeadsPage: React.FC = () => {
       setFilterAgent('unassigned');
     }
   }, [searchParams]);
+
+  // Sync live WhatsApp leads from backend
+  useEffect(() => {
+    fetchBackendLeads();
+    const interval = setInterval(() => {
+      fetchBackendLeads();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [fetchBackendLeads]);
 
   // New Lead Form State
   const [formName, setFormName] = useState('');

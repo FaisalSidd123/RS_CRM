@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
 import { StatCard } from '@/components/StatCard';
@@ -54,9 +54,13 @@ const SOURCE_COLORS: Record<string, string> = {
 
 export const DashboardPage: React.FC = () => {
   const { currentUser } = useAuthStore();
-  const { leads, properties, clients, deals, visits, tasks, commissions, expenses, users, agencyProfile } = useAppStore();
+  const { leads, fetchBackendLeads, properties, clients, deals, visits, tasks, commissions, expenses, users, agencyProfile } = useAppStore();
   const [dateRange, setDateRange] = useState<'This month' | 'Last month' | 'Last 90 days' | 'This year'>('This month');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchBackendLeads();
+  }, [fetchBackendLeads]);
 
   const isOwnerOrManager = currentUser?.role === 'Owner' || currentUser?.role === 'Manager';
   const isAgent = currentUser?.role === 'Agent';

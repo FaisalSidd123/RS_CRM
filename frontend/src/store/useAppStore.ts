@@ -3,7 +3,8 @@ import { persist } from 'zustand/middleware';
 import {
   Lead, Property, Client, Deal, SiteVisit, Task, CommissionEntry,
   Expense, WhatsAppRule, WhatsAppTemplate, WhatsAppLog,
-  ActivityLogEntry, NotificationItem, User, DealStage, VisitFeedback, TaskPriority, TaskType
+  ActivityLogEntry, NotificationItem, User, DealStage, VisitFeedback, TaskPriority, TaskType,
+  LeadTemperature, LeadStatus, LeadSource, LeadInterest, PropertyType
 } from '@/types';
 import { INITIAL_USERS } from '@/data/users';
 import { INITIAL_WHATSAPP_RULES, INITIAL_WHATSAPP_TEMPLATES } from '@/data/whatsapp';
@@ -58,6 +59,7 @@ interface AppState {
   agencyProfile: AgencyProfile;
 
   // Leads
+  fetchBackendLeads: () => Promise<void>;
   addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'activities'>) => Lead;
   updateLead: (id: string, updates: Partial<Lead>) => void;
   deleteLead: (id: string) => void;
@@ -118,6 +120,64 @@ interface AppState {
   resetDemoData: () => void;
 }
 
+function mapBackendLead(bLead: any): Lead {
+  const normTemp: LeadTemperature = 
+    bLead.temperature?.toLowerCase() === 'warm' ? 'Warm' :
+    bLead.temperature?.toLowerCase() === 'cold' ? 'Cold' : 'Hot';
+
+  const normStatus: LeadStatus = 
+    bLead.status?.toLowerCase() === 'contacted' ? 'Contacted' :
+    bLead.status?.toLowerCase() === 'qualified' ? 'Qualified' :
+    bLead.status?.toLowerCase() === 'won' ? 'Won' :
+    bLead.status?.toLowerCase() === 'lost' ? 'Lost' : 'New';
+
+  const normSource: LeadSource = 
+    bLead.source?.toLowerCase() === 'facebook' ? 'Facebook' :
+    bLead.source?.toLowerCase() === 'zameen' ? 'Zameen' : 'WhatsApp';
+
+  const normInterest: LeadInterest = 
+    bLead.interest?.toLowerCase() === 'rent' ? 'Rent' :
+    bLead.interest?.toLowerCase() === 'sell' ? 'Sell' :
+    bLead.interest?.toLowerCase() === 'invest' ? 'Invest' : 'Buy';
+
+  const normPropType: PropertyType = 
+    bLead.propertyType?.toLowerCase() === 'apartment' ? 'Apartment' :
+    bLead.propertyType?.toLowerCase() === 'house' ? 'House' :
+    bLead.propertyType?.toLowerCase() === 'commercial shop' ? 'Commercial Shop' :
+    bLead.propertyType?.toLowerCase() === 'office' ? 'Office' :
+    bLead.propertyType?.toLowerCase() === 'farmhouse' ? 'Farmhouse' : 'Plot';
+
+  return {
+    id: bLead.id,
+    name: bLead.fullName || bLead.name || 'WhatsApp Inquiry',
+    phone: bLead.phone || bLead.rawPhone || '',
+    email: bLead.email || '',
+    source: normSource,
+    interest: normInterest,
+    propertyType: normPropType,
+    budgetMin: bLead.budgetMin || 75000000,
+    budgetMax: bLead.budgetMax || 75000000,
+    preferredLocations: Array.isArray(bLead.preferredLocations) && bLead.preferredLocations.length > 0 
+      ? bLead.preferredLocations 
+      : ['DHA Karachi'],
+    assignedAgentId: bLead.assignedAgentId || undefined,
+    temperature: normTemp,
+    status: normStatus,
+    notes: bLead.inquiryNotes || bLead.notes || '',
+    createdAt: bLead.createdAt || new Date().toISOString(),
+    isDuplicate: bLead.isDuplicate || false,
+    activities: [
+      {
+        id: `act-${bLead.id}`,
+        type: 'WhatsApp',
+        description: bLead.inquiryNotes ? `WhatsApp: "${bLead.inquiryNotes}"` : 'WhatsApp inquiry received',
+        createdAt: bLead.createdAt || new Date().toISOString(),
+        authorName: 'Meta WhatsApp Engine',
+      },
+    ],
+  };
+}
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -138,6 +198,28 @@ export const useAppStore = create<AppState>()(
       agencyProfile: DEFAULT_AGENCY_PROFILE,
 
       // Leads Actions
+      fetchBackendLeads: async () => {
+        try {
+          const res = await fetch('http://localhost:5000/api/leads');
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data.success && Array.isArray(data.leads)) {
+            const backendLeads: Lead[] = data.leads.map(mapBackendLead);
+            set((state) => {
+              const backendMap = new Map(backendLeads.map((l) => [l.id, l]));
+              const updatedExisting = state.leads.map((l) =>
+                backendMap.has(l.id) ? { ...l, ...backendMap.get(l.id) } : l
+              );
+              const existingIds = new Set(state.leads.map((l) => l.id));
+              const freshOnes = backendLeads.filter((l) => !existingIds.has(l.id));
+              return { leads: [...freshOnes, ...updatedExisting] };
+            });
+          }
+        } catch (err) {
+          console.error('[PropertyOS] Failed to sync backend leads:', err);
+        }
+      },
+
       addLead: (leadInput) => {
         const id = `lead-${Date.now()}`;
         const newLead: Lead = {
