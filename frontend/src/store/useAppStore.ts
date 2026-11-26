@@ -60,6 +60,9 @@ interface AppState {
 
   // Leads
   fetchBackendLeads: () => Promise<void>;
+  claimLead: (leadId: string, managerId: string) => Promise<{ success: boolean; message: string }>;
+  releaseLeadLock: (leadId: string, userId: string) => Promise<{ success: boolean; message: string }>;
+  assignLeadToAgent: (leadId: string, agentId: string, userId: string) => Promise<{ success: boolean; message: string }>;
   addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'activities'>) => Lead;
   updateLead: (id: string, updates: Partial<Lead>) => void;
   deleteLead: (id: string) => void;
@@ -166,15 +169,21 @@ function mapBackendLead(bLead: any): Lead {
     notes: bLead.inquiryNotes || bLead.notes || '',
     createdAt: bLead.createdAt || new Date().toISOString(),
     isDuplicate: bLead.isDuplicate || false,
-    activities: [
-      {
-        id: `act-${bLead.id}`,
-        type: 'WhatsApp',
-        description: bLead.inquiryNotes ? `WhatsApp: "${bLead.inquiryNotes}"` : 'WhatsApp inquiry received',
-        createdAt: bLead.createdAt || new Date().toISOString(),
-        authorName: 'Meta WhatsApp Engine',
-      },
-    ],
+    isLocked: !!bLead.isLocked,
+    claimedByManagerId: bLead.claimedByManagerId || undefined,
+    claimedByManagerName: bLead.claimedByManagerName || undefined,
+    lockedAt: bLead.lockedAt || undefined,
+    activities: Array.isArray(bLead.activities) && bLead.activities.length > 0
+      ? bLead.activities
+      : [
+          {
+            id: `act-${bLead.id}`,
+            type: 'WhatsApp',
+            description: bLead.inquiryNotes ? `WhatsApp: "${bLead.inquiryNotes}"` : 'WhatsApp inquiry received',
+            createdAt: bLead.createdAt || new Date().toISOString(),
+            authorName: 'Meta WhatsApp Engine',
+          },
+        ],
   };
 }
 
@@ -207,16 +216,84 @@ export const useAppStore = create<AppState>()(
             const backendLeads: Lead[] = data.leads.map(mapBackendLead);
             set((state) => {
               const backendMap = new Map(backendLeads.map((l) => [l.id, l]));
-              const updatedExisting = state.leads.map((l) =>
-                backendMap.has(l.id) ? { ...l, ...backendMap.get(l.id) } : l
-              );
+              const updatedExisting = state.leads.map((l) => {
+                const b = backendMap.get(l.id);
+                if (!b) return l;
+                const mergedActivities =
+                  b.activities && b.activities.length >= (l.activities?.length || 0)
+                    ? b.activities
+                    : (l.activities || b.activities || []);
+                return { ...l, ...b, activities: mergedActivities };
+              });
               const existingIds = new Set(state.leads.map((l) => l.id));
               const freshOnes = backendLeads.filter((l) => !existingIds.has(l.id));
-              return { leads: [...freshOnes, ...updatedExisting] };
+              return { leads: [...freshOnes, ...updatedExisting], users: INITIAL_USERS };
             });
           }
         } catch (err) {
           console.error('[PropertyOS] Failed to sync backend leads:', err);
+        }
+      },
+
+      claimLead: async (leadId: string, managerId: string) => {
+        try {
+          const res = await fetch(`http://localhost:5000/api/leads/${leadId}/claim`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ managerId }),
+          });
+          const data = await res.json();
+          await get().fetchBackendLeads();
+          if (res.ok && data.success) {
+            return { success: true, message: data.message || 'Lead locked successfully.' };
+          } else {
+            return { success: false, message: data.message || 'Lead is locked by another manager.' };
+          }
+        } catch (err: any) {
+          return { success: false, message: err.message || 'Failed to claim lead' };
+        }
+      },
+
+      releaseLeadLock: async (leadId: string, userId: string) => {
+        try {
+          const res = await fetch(`http://localhost:5000/api/leads/${leadId}/release-lock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+          });
+          const data = await res.json();
+          await get().fetchBackendLeads();
+          if (res.ok && data.success) {
+            return { success: true, message: data.message || 'Lock released successfully.' };
+          } else {
+            return { success: false, message: data.message || 'Failed to release lock.' };
+          }
+        } catch (err: any) {
+          return { success: false, message: err.message || 'Failed to release lock' };
+        }
+      },
+
+      assignLeadToAgent: async (leadId: string, agentId: string, userId: string) => {
+        try {
+          const res = await fetch(`http://localhost:5000/api/leads/${leadId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              assignedAgentId: agentId,
+              status: 'qualified',
+              isLocked: false,
+            }),
+          });
+          const data = await res.json();
+          await get().fetchBackendLeads();
+          if (res.ok && data.lead) {
+            return { success: true, message: 'Lead successfully assigned to field agent.' };
+          } else {
+            return { success: false, message: data.message || 'Failed to assign lead.' };
+          }
+        } catch (err: any) {
+          return { success: false, message: err.message || 'Failed to assign lead' };
         }
       },
 
@@ -294,9 +371,16 @@ export const useAppStore = create<AppState>()(
         };
         set((state) => ({
           leads: state.leads.map((l) =>
-            l.id === leadId ? { ...l, activities: [newAct, ...l.activities] } : l
+            l.id === leadId ? { ...l, activities: [newAct, ...(l.activities || [])] } : l
           ),
         }));
+
+        // Persist activity note to backend database
+        fetch(`http://localhost:5000/api/leads/${leadId}/activities`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(activity),
+        }).catch((err) => console.error('[PropertyOS] Failed to save activity note to backend:', err));
       },
 
       // Properties Actions

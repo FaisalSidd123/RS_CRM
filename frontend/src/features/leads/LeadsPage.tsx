@@ -75,6 +75,9 @@ export const LeadsPage: React.FC = () => {
   const {
     leads,
     fetchBackendLeads,
+    claimLead,
+    releaseLeadLock,
+    assignLeadToAgent,
     addLead,
     updateLead,
     reassignLeads,
@@ -153,21 +156,36 @@ export const LeadsPage: React.FC = () => {
   // Role filtering: Agents see only own leads
   const roleFilteredLeads = useMemo(() => {
     if (currentUser?.role === 'Agent') {
-      return leads.filter((l) => l.assignedAgentId === currentUser.id);
+      return leads.filter((l) => {
+        if (!l.assignedAgentId) return false;
+        // Direct ID match
+        if (l.assignedAgentId === currentUser.id) return true;
+        // Legacy ID match for Ayesha Khan
+        if (currentUser.email.includes('ayesha') && (l.assignedAgentId === 'usr-3' || l.assignedAgentId === 'usr-agent-2')) {
+          return true;
+        }
+        // Name lookup match
+        const assignedName = agentsMap[l.assignedAgentId];
+        return assignedName && currentUser.name && assignedName.toLowerCase() === currentUser.name.toLowerCase();
+      });
     }
     return leads;
-  }, [leads, currentUser]);
+  }, [leads, currentUser, agentsMap]);
 
   const activeAgents = useMemo(() => {
     return users.filter((u) => u.role === 'Agent' && u.active);
   }, [users]);
 
-  const handleAssignSingleLead = (leadId: string, targetAgentId: string) => {
-    reassignLeads([leadId], targetAgentId);
+  const handleAssignSingleLead = async (leadId: string, targetAgentId: string) => {
+    if (currentUser?.id) {
+      await assignLeadToAgent(leadId, targetAgentId, currentUser.id);
+    } else {
+      reassignLeads([leadId], targetAgentId);
+    }
     const agentName = agentsMap[targetAgentId] || 'Agent';
     toast.success(`Lead successfully assigned to ${agentName}.`);
     if (selectedLead && selectedLead.id === leadId) {
-      setSelectedLead((prev) => (prev ? { ...prev, assignedAgentId: targetAgentId } : null));
+      setSelectedLead((prev) => (prev ? { ...prev, assignedAgentId: targetAgentId, isLocked: false } : null));
     }
   };
 
@@ -245,18 +263,25 @@ export const LeadsPage: React.FC = () => {
 
   const handleLogActivity = () => {
     if (!selectedLead || !activityDesc) return;
+    const author = currentUser?.name || 'Manager';
+    const newAct: any = {
+      id: `act-${Date.now()}`,
+      type: activityType,
+      description: activityDesc,
+      outcome: activityOutcome,
+      authorName: author,
+      createdAt: new Date().toISOString(),
+    };
     addLeadActivity(selectedLead.id, {
       type: activityType,
       description: activityDesc,
       outcome: activityOutcome,
-      authorName: currentUser?.name || 'Agent',
+      authorName: author,
     });
-    toast.success(`${activityType} activity logged.`);
+    setSelectedLead((prev) => (prev ? { ...prev, activities: [newAct, ...(prev.activities || [])] } : null));
+    toast.success(`${activityType} activity saved to timeline.`);
     setActivityDesc('');
     setActivityOutcome('');
-    // refresh selected lead from store
-    const updated = leads.find((l) => l.id === selectedLead.id);
-    if (updated) setSelectedLead(updated);
   };
 
   const handleConvertToDeal = () => {
@@ -423,6 +448,70 @@ export const LeadsPage: React.FC = () => {
             <span className="text-slate-800 font-medium">{agentName}</span>
           </div>
         );
+      },
+    },
+    {
+      key: 'concurrencyLock' as any,
+      header: 'Manager Lock',
+      render: (lead: Lead) => {
+        const isManagerOrOwner = currentUser?.role === 'Manager' || currentUser?.role === 'Owner';
+        const isMyLock = lead.isLocked && lead.claimedByManagerId === currentUser?.id;
+        const isOtherLock = lead.isLocked && lead.claimedByManagerId && lead.claimedByManagerId !== currentUser?.id;
+
+        if (isMyLock) {
+          return (
+            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+                <span>⚡</span> Under Your Review
+              </span>
+              <button
+                onClick={async () => {
+                  const res = await releaseLeadLock(lead.id, currentUser!.id);
+                  if (res.success) toast.success(res.message);
+                  else toast.error(res.message);
+                }}
+                className="text-[10px] text-slate-500 hover:text-red-600 underline font-medium"
+                title="Release lock back to pool"
+              >
+                Release
+              </button>
+            </div>
+          );
+        }
+
+        if (isOtherLock) {
+          return (
+            <div
+              className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
+              title={`Locked by ${lead.claimedByManagerName || 'Another Manager'}`}
+            >
+              <span>🔒</span>
+              <span className="truncate max-w-[110px]">{lead.claimedByManagerName || 'Manager Locked'}</span>
+            </div>
+          );
+        }
+
+        if (!lead.assignedAgentId && isManagerOrOwner) {
+          return (
+            <button
+              onClick={async (e) => {
+                e.stopPropagation();
+                const res = await claimLead(lead.id, currentUser!.id);
+                if (res.success) {
+                  toast.success(`⚡ Lead locked! You are now triaging ${lead.name}.`);
+                  setSelectedLead(lead);
+                } else {
+                  toast.error(res.message);
+                }
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all active:scale-95"
+            >
+              <span>⚡</span> Claim Lead
+            </button>
+          );
+        }
+
+        return <span className="text-slate-400 text-xs">-</span>;
       },
     },
     {
@@ -851,6 +940,65 @@ export const LeadsPage: React.FC = () => {
                 <StatusBadge status={selectedLead.status} />
               </div>
             </SheetHeader>
+
+            {/* Manager Concurrency Lock Status Banner */}
+            {selectedLead.isLocked && selectedLead.claimedByManagerId === currentUser?.id && (
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-800 font-bold">⚡ Locked by You for Triage</span>
+                  <span className="text-slate-500 hidden sm:inline">Other managers cannot claim this lead right now.</span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    const res = await releaseLeadLock(selectedLead.id, currentUser!.id);
+                    if (res.success) {
+                      toast.success(res.message);
+                      setSelectedLead((prev) => (prev ? { ...prev, isLocked: false, claimedByManagerId: undefined } : null));
+                    } else {
+                      toast.error(res.message);
+                    }
+                  }}
+                  className="text-xs h-7 text-red-600 border-red-200 hover:bg-red-50"
+                >
+                  Release Lock to Pool
+                </Button>
+              </div>
+            )}
+
+            {selectedLead.isLocked && selectedLead.claimedByManagerId && selectedLead.claimedByManagerId !== currentUser?.id && (
+              <div className="p-3 bg-slate-100 border border-slate-300 rounded-lg flex items-center gap-2 text-xs">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <span className="text-slate-800 font-medium">
+                  <strong>Locked by {selectedLead.claimedByManagerName || 'Another Manager'}</strong> — Currently under review.
+                </span>
+              </div>
+            )}
+
+            {!selectedLead.isLocked && !selectedLead.assignedAgentId && (currentUser?.role === 'Manager' || currentUser?.role === 'Owner') && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-emerald-900 font-bold block">Unclaimed Lead in Pool</span>
+                  <span className="text-emerald-700 text-[11px]">Lock this lead to triage and assign to an agent.</span>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    const res = await claimLead(selectedLead.id, currentUser!.id);
+                    if (res.success) {
+                      toast.success(res.message);
+                      setSelectedLead((prev) => (prev ? { ...prev, isLocked: true, claimedByManagerId: currentUser.id } : null));
+                    } else {
+                      toast.error(res.message);
+                    }
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8"
+                >
+                  ⚡ Claim Lead
+                </Button>
+              </div>
+            )}
 
             {/* Quick Contact & Action Buttons */}
             <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">

@@ -48,6 +48,10 @@ export interface Lead {
   createdAt: string;
   isDuplicate?: boolean;
   duplicateOfLeadId?: string;
+  isLocked?: boolean;
+  claimedByManagerId?: string;
+  claimedByManagerName?: string;
+  lockedAt?: string;
   activities: ActivityItem[];
 }
 
